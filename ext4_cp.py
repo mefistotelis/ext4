@@ -164,7 +164,7 @@ def main():
         fnsplit = fname.split(":", 1)
         if fnsplit[0] != args.imgfname:
             raise ValueError(f"Single command can only extract from one image, not '{fnsplit[0]:s}'.")
-        src_fname = fnsplit[1]
+        src_fname = fnsplit[1] if len(fnsplit) > 1 else "."
         if src_fname.endswith("/"): src_fname = src_fname[:-1]
         args.src_fnames += [ src_fname ]
 
