@@ -29,9 +29,11 @@ import os
 import sys
 import argparse
 
-# git clone https://github.com/cubinator/ext4.git
-
 def extract(inode, path, rel_path, file_name, file_type, args):
+    """ Callback function for extracting files.
+
+    Returns true if current inode is expected to be handled recursively as folder.
+    """
     dst_fpath = []
     if args.directory != "":
         dst_fpath.append(args.directory)
@@ -40,6 +42,8 @@ def extract(inode, path, rel_path, file_name, file_type, args):
     dst_fpath.append(file_name)
     dst_fpath = "/".join(dst_fpath)
     if file_type == ext4.InodeType.FILE:
+        if args.verbose > 1:
+            print(f"{rel_path:s}/{file_name:s}")
         reader = inode.open_read() # Either ext4.BlockReader or io.BytesIO
         with open(dst_fpath, "wb") as dst_file:
             dst_file.write(reader.read())
@@ -48,23 +52,35 @@ def extract(inode, path, rel_path, file_name, file_type, args):
             pass
         elif not args.recursive:
             if args.verbose > 0:
-                print(f"{args.imgfname:s}: -R not specified; omitting directory '{file_name:s}'")
+                print(f"{args.imgfname:s}: -R not specified; omitting directory '{rel_path:s}/{file_name:s}'")
         else:
+            if args.verbose > 1:
+                print(f"{rel_path:s}/{file_name:s}")
             os.mkdir(dst_fpath)
             return True
     elif file_type == ext4.InodeType.CHARACTER_DEVICE:
+        if args.verbose > 1:
+            print(f"{rel_path:s}/{file_name:s}")
         with open(dst_fpath, "wb") as dst_file:
             pass
     elif file_type == ext4.InodeType.BLOCK_DEVICE:
+        if args.verbose > 1:
+            print(f"{rel_path:s}/{file_name:s}")
         with open(dst_fpath, "wb") as dst_file:
             pass
     elif file_type == ext4.InodeType.FIFO:
+        if args.verbose > 1:
+            print(f"{rel_path:s}/{file_name:s}")
         with open(dst_fpath, "wb") as dst_file:
             pass
     elif file_type == ext4.InodeType.SOCKET:
+        if args.verbose > 1:
+            print(f"{rel_path:s}/{file_name:s}")
         with open(dst_fpath, "wb") as dst_file:
             pass
     elif file_type == ext4.InodeType.SYMBOLIC_LINK:
+        if args.verbose > 1:
+            print(f"{rel_path:s}/{file_name:s}")
         reader = inode.open_read()
         symlink_fpath = reader.read().decode("utf8")
         os.symlink(symlink_fpath, dst_fpath)
@@ -160,8 +176,6 @@ def main():
     if args.verbose > 0:
         print(f"{args.imgfname:s}, Volume {volume.uuid:s} has block size {volume.block_size:d}")
 
-    #for_all_entries_do(volume.root, "", "", extract, args)
-
     for src_fname in args.src_fnames:
         for_path_do(volume.root, "", src_fname, extract, args)
 
@@ -170,5 +184,5 @@ if __name__ == "__main__":
         main()
     except Exception as ex:
         print("Error: "+str(ex))
-        raise
+        #raise
         sys.exit(10)
