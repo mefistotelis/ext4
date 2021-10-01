@@ -28,6 +28,7 @@ import ext4
 import os
 import sys
 import argparse
+import pathlib
 
 def extract(inode, path, rel_path, file_name, file_type, args):
     """ Callback function for extracting files.
@@ -41,6 +42,14 @@ def extract(inode, path, rel_path, file_name, file_type, args):
         dst_fpath.append(rel_path)
     dst_fpath.append(file_name)
     dst_fpath = "/".join(dst_fpath)
+    if args.conflict_rename and file_type != ext4.InodeType.DIRECTORY:
+        i = 0
+        p = pathlib.PurePath(dst_fpath)
+        dst_fpath_uniq = dst_fpath
+        while os.path.exists(dst_fpath_uniq):
+            i += 1
+            dst_fpath_uniq = p.with_stem(f"{p.stem:s}_{i:d}")
+        dst_fpath = dst_fpath_uniq
     if file_type == ext4.InodeType.FILE:
         if args.verbose > 1:
             print(f"{rel_path:s}/{file_name:s}")
@@ -56,7 +65,8 @@ def extract(inode, path, rel_path, file_name, file_type, args):
         else:
             if args.verbose > 1:
                 print(f"{rel_path:s}/{file_name:s}")
-            os.mkdir(dst_fpath)
+            if not os.path.isdir(dst_fpath):
+                os.mkdir(dst_fpath)
             return True
     elif file_type == ext4.InodeType.CHARACTER_DEVICE:
         if args.verbose > 1:
@@ -148,6 +158,9 @@ def main():
 
     parser.add_argument('-R', '--recursive', action='store_true',
             help="copy the SOURCE folders recursively")
+
+    parser.add_argument('-n', '--conflict-rename', action='store_true',
+            help="on name conflict (file already exists), rename the output file")
 
     parser.add_argument('-v', '--verbose', action='count', default=0,
             help="increases verbosity level; max level is set by -vvv")
