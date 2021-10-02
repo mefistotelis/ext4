@@ -46,10 +46,11 @@ def extract(inode, path, rel_path, file_name, file_type, args):
         i = 0
         p = pathlib.PurePath(dst_fpath)
         dst_fpath_uniq = dst_fpath
-        while os.path.exists(dst_fpath_uniq):
+        while os.path.exists(dst_fpath_uniq) or os.path.islink(dst_fpath_uniq):
             i += 1
             dst_fpath_uniq = p.with_stem(f"{p.stem:s}_{i:d}")
         dst_fpath = dst_fpath_uniq
+
     if file_type == ext4.InodeType.FILE:
         if args.verbose > 1:
             print(f"{rel_path:s}/{file_name:s}")
@@ -93,7 +94,8 @@ def extract(inode, path, rel_path, file_name, file_type, args):
             print(f"{rel_path:s}/{file_name:s}")
         reader = inode.open_read()
         symlink_fpath = reader.read().decode("utf8")
-        os.symlink(symlink_fpath, dst_fpath)
+        if not os.path.islink(dst_fpath):
+            os.symlink(symlink_fpath, dst_fpath)
     return False
 
 
