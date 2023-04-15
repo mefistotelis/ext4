@@ -25,10 +25,11 @@ __license__ = "GPL"
 
 import ext4
 
-import os
-import sys
 import argparse
+import os
 import pathlib
+import sys
+
 
 def extract(inode, path, rel_path, file_name, file_type, args):
     """ Callback function for extracting files.
@@ -49,14 +50,15 @@ def extract(inode, path, rel_path, file_name, file_type, args):
         while os.path.exists(dst_fpath_uniq) or os.path.islink(dst_fpath_uniq):
             i += 1
             dst_fpath_uniq = p.with_stem(f"{p.stem:s}_{i:d}")
-        dst_fpath = dst_fpath_uniq
+        dst_fpath = str(dst_fpath_uniq)
 
     if file_type == ext4.InodeType.FILE:
         if args.verbose > 1:
             print(f"{rel_path:s}/{file_name:s}")
         reader = inode.open_read() # Either ext4.BlockReader or io.BytesIO
         with open(dst_fpath, "wb") as dst_file:
-            dst_file.write(reader.read())
+            while data := reader.read(64*1024):
+                dst_file.write(data)
     elif file_type == ext4.InodeType.DIRECTORY:
         if file_name in (".","..",):
             pass
@@ -101,12 +103,20 @@ def extract(inode, path, rel_path, file_name, file_type, args):
 
 def for_all_entries_do(inode, full_path, part_path, do_func, args):
     """ Executes given function for all entries within the inode, recursively.
+        @param inode container inode
+        @param full_path path of the container inode
+        @param target_path the path to target node, relative to initial inode
+        @param part_path partial path to target node, relative to start point of the iteration
+        @param do_func function performing an action on each node
+        @param args arguments array to be transferred to do_func
     """
     for file_name, inode_idx, file_type in inode.open_dir():
         sub_inode = inode.volume.get_inode(inode_idx)
         go_deeper = do_func(sub_inode, full_path, part_path, file_name, file_type, args)
         if go_deeper:
-            for_all_entries_do(sub_inode, full_path+"/"+file_name, part_path+"/"+file_name, do_func, args)
+            sub_part_path = (part_path+"/"+file_name) if part_path else file_name
+            for_all_entries_do(sub_inode, full_path+"/"+file_name, sub_part_path, do_func, args)
+
 
 def for_path_do(inode, current_path, target_path, do_func, args):
     """ Executes given function for entries within an inode at given path, recursively.
@@ -144,6 +154,7 @@ def for_path_do(inode, current_path, target_path, do_func, args):
         if go_deeper:
             for_all_entries_do(sub_inode, sub_path+"/"+file_name, file_name, do_func, args)
     return
+
 
 def main():
     """ Main executable function.
@@ -193,6 +204,7 @@ def main():
 
     for src_fname in args.src_fnames:
         for_path_do(volume.root, "", src_fname, extract, args)
+
 
 if __name__ == "__main__":
     try:
