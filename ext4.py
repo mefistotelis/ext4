@@ -1033,18 +1033,20 @@ class BlockReader:
         end_block_idx = (self.cursor + byte_len - 1) // self.volume.block_size
         end_of_stream_check = byte_len
 
-        blocks = [self.read_block(i) for i in range(start_block_idx, end_block_idx - start_block_idx + 1)]
+        blocks = [self.read_block(i) for i in range(start_block_idx, end_block_idx + 1)]
 
         start_offset = self.cursor % self.volume.block_size
         if start_offset != 0: blocks[0] = blocks[0][start_offset:]
-        byte_len = (byte_len + start_offset - self.volume.block_size - 1) % self.volume.block_size + 1
-        blocks[-1] = blocks[-1][:byte_len]
+        nearend_offset = (self.cursor + byte_len) % self.volume.block_size
+        if nearend_offset == 0: nearend_offset = self.volume.block_size
+        if len(blocks) == 1: nearend_offset -= start_offset
+        blocks[-1] = blocks[-1][:nearend_offset]
 
         result = b"".join(blocks)
 
         # Check read
         if len(result) != end_of_stream_check:
-            raise EndOfStreamError(f"The volume's underlying stream ended {byte_len - len(result):d} bytes before EOF.")
+            raise EndOfStreamError(f"The volume's underlying stream ended {end_of_stream_check - len(result):d} bytes before EOF.")
 
         self.cursor += len(result)
         return result
