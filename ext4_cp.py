@@ -36,13 +36,17 @@ def extract(inode, path, rel_path, file_name, file_type, args):
 
     Returns true if current inode is expected to be handled recursively as folder.
     """
+    sep = os.sep
+    if args.flatten:
+        sep = "_"
     dst_fpath = []
     if args.directory != "":
         dst_fpath.append(args.directory)
     if rel_path != "":
         dst_fpath.append(rel_path)
     dst_fpath.append(file_name)
-    dst_fpath = "/".join(dst_fpath)
+    dst_fpath = ["/".join(dst_fpath[:2])] + dst_fpath[2:]
+    dst_fpath = sep.join(dst_fpath)
     if args.conflict_rename and file_type != ext4.InodeType.DIRECTORY:
         i = 0
         p = pathlib.PurePath(dst_fpath)
@@ -65,6 +69,8 @@ def extract(inode, path, rel_path, file_name, file_type, args):
         elif not args.recursive:
             if args.verbose > 0:
                 print(f"{args.imgfname:s}: -R not specified; omitting directory '{rel_path:s}/{file_name:s}'")
+        elif args.flatten:
+            return True # flatten means just files, no directories
         else:
             if args.verbose > 1:
                 print(f"{rel_path:s}/{file_name:s}")
@@ -96,6 +102,7 @@ def extract(inode, path, rel_path, file_name, file_type, args):
             print(f"{rel_path:s}/{file_name:s}")
         reader = inode.open_read()
         symlink_fpath = reader.read().decode("utf8")
+        symlink_fpath = symlink_fpath.replace("/", sep)
         if not os.path.islink(dst_fpath):
             os.symlink(symlink_fpath, dst_fpath)
     return False
@@ -105,17 +112,19 @@ def for_all_entries_do(inode, full_path, part_path, do_func, args):
     """ Executes given function for all entries within the inode, recursively.
         @param inode container inode
         @param full_path path of the container inode
-        @param target_path the path to target node, relative to initial inode
         @param part_path partial path to target node, relative to start point of the iteration
         @param do_func function performing an action on each node
         @param args arguments array to be transferred to do_func
     """
+    sep = "/"
+    if args.flatten:
+        sep = "_"
     for file_name, inode_idx, file_type in inode.open_dir():
         sub_inode = inode.volume.get_inode(inode_idx)
         go_deeper = do_func(sub_inode, full_path, part_path, file_name, file_type, args)
         if go_deeper:
-            sub_part_path = (part_path+"/"+file_name) if part_path else file_name
-            for_all_entries_do(sub_inode, full_path+"/"+file_name, sub_part_path, do_func, args)
+            sub_part_path = f"{part_path:s}{sep:s}{file_name:s}" if part_path else file_name
+            for_all_entries_do(sub_inode, f"{full_path:s}/{file_name:s}", sub_part_path, do_func, args)
 
 
 def for_path_do(inode, current_path, target_path, do_func, args):
@@ -171,6 +180,9 @@ def main():
 
     parser.add_argument('-R', '--recursive', action='store_true',
             help="copy the SOURCE folders recursively")
+
+    parser.add_argument('-t', '--flatten', action='store_true',
+            help="flatten the extracted directory structure")
 
     parser.add_argument('-n', '--conflict-rename', action='store_true',
             help="on name conflict (file already exists), rename the output file")
