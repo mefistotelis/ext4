@@ -60,6 +60,13 @@ def extract(inode, path, rel_path, file_name, file_type, args):
         if args.verbose > 1:
             print(f"{rel_path:s}/{file_name:s}")
         reader = inode.open_read() # Either ext4.BlockReader or io.BytesIO
+        if args.wa_fnames and sys.platform == 'win32':
+            # Windows is an idiotic OS. No way to say that milder, if after 40 years it still
+            # cannot handle any file naming rules or conventions. In some specific versions
+            # (maybe related to storage drivers?) creation of files with specific extensions will
+            # randomly fail, terminating python interpreter. Workaround that by appending .bin.
+            if dst_fpath.endswith(".fw"):
+                dst_fpath += ".bin"
         with open(dst_fpath, "wb") as dst_file:
             while data := reader.read(64*1024):
                 dst_file.write(data)
@@ -183,6 +190,9 @@ def main():
 
     parser.add_argument('-t', '--flatten', action='store_true',
             help="flatten the extracted directory structure")
+
+    parser.add_argument('--wa-fnames', action='store_true',
+            help="workaround file names to allow extraction on non-POSIX OSes")
 
     parser.add_argument('-n', '--conflict-rename', action='store_true',
             help="on name conflict (file already exists), rename the output file")
